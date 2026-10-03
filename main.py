@@ -242,6 +242,8 @@ def debug_config():
         "has_telegram": bool(settings.telegram_bot_token and settings.telegram_chat_id),
         "has_supabase": bool(settings.supabase_url and settings.supabase_key),
         "has_fmp": bool(settings.fmp_api_key),
+        "has_finnhub": bool(getattr(settings, "finnhub_api_key", "")),
         "gold_symbol": settings.gold_binance_symbol,
         "min_importance": settings.min_importance,
+        "allowed_countries": list(settings.allowed_countries),
     }
