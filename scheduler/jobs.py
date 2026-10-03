@@ -15,36 +15,16 @@ log = logging.getLogger(__name__)
 
 def refresh_events() -> dict:
     """Fetch events and store them. Returns diagnostic dict."""
-    result = {
-        "fetched": 0,
-        "stored": 0,
-        "failed": 0,
-        "fmp_raw": 0,
-        "ff_raw": 0,
-        "errors": [],
-    }
+    result = {"fetched": 0, "stored": 0, "failed": 0, "diag": {}, "errors": []}
 
-    # --- FMP ---
     try:
-        fmp_events = news_fetcher.fetch_fmp()
-        result["fmp_raw"] = len(fmp_events)
+        events, diag = news_fetcher.fetch_all()
+        result["diag"] = diag
+        result["fetched"] = len(events)
     except Exception as exc:
-        result["errors"].append(f"fmp_fetch: {exc}")
-        fmp_events = []
+        result["errors"].append(f"fetch: {exc}")
+        return result
 
-    # --- ForexFactory fallback ---
-    ff_events = []
-    if not fmp_events:
-        try:
-            ff_events = news_fetcher.fetch_forexfactory()
-            result["ff_raw"] = len(ff_events)
-        except Exception as exc:
-            result["errors"].append(f"ff_fetch: {exc}")
-
-    events = fmp_events or ff_events
-    result["fetched"] = len(events)
-
-    # --- Store ---
     for ev in events:
         try:
             row = db.upsert_event(ev)
@@ -57,14 +37,7 @@ def refresh_events() -> dict:
             if len(result["errors"]) < 5:
                 result["errors"].append(f"upsert: {exc}")
 
-    log.info(
-        "refresh_events: fmp=%d ff=%d fetched=%d stored=%d failed=%d",
-        result["fmp_raw"], result["ff_raw"],
-        result["fetched"], result["stored"], result["failed"],
-    )
-    if result["errors"]:
-        log.warning("refresh_events errors: %s", result["errors"])
-
+    log.info("refresh_events: %s", result)
     return result
 
 
