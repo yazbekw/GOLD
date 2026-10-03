@@ -156,7 +156,51 @@ def debug_config():
         "min_importance": settings.min_importance,
     }
 
+@app.get("/test-group")
+def test_group(hours: int = 48, token: str = Query("")):
+    """Test grouping — fetch all events in the next N hours and send one grouped message."""
+    _require_admin(token)
 
+    from datetime import datetime, timedelta, timezone
+    from data import macro_fetcher, price_fetcher
+    from engine import decision_engine
+    from storage import db as db_module
+    from scheduler import jobs
+
+    now = datetime.now(timezone.utc)
+    start = now.isoformat()
+    end = (now + timedelta(hours=hours)).isoformat()
+
+    events = db_module.events_between(start, end)
+    if not events:
+        return {"ok": False, "error": "no events in window", "start": start, "end": end}
+
+    # Group them
+    groups = jobs._group_by_time(events)
+
+    macro = macro_fetcher.fetch_macro()
+    gold = price_fetcher.fetch_gold()
+    sent = 0
+    details = []
+
+    for group in groups:
+        brief = decision_engine.build_pre_event_brief(group[0], macro, gold)
+        ok = telegram.send_pre_event_group(group, brief)
+        sent += 1 if ok else 0
+        details.append({
+            "count": len(group),
+            "titles": [e.get("title") for e in group],
+            "event_time": group[0].get("event_time"),
+            "ok": ok,
+        })
+
+    return {
+        "ok": True,
+        "events_total": len(events),
+        "groups_sent": sent,
+        "groups": details,
+    }
+    
 @app.get("/debug/news")
 def debug_news():
     from data import news_fetcher
