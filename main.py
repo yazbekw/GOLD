@@ -161,7 +161,56 @@ def test_telegram_get():
     """Convenience — allows testing from a browser."""
     ok = telegram.send_health("اختبار الاتصال ✅")
     return {"ok": ok}
+@app.get("/debug/ff-raw")
+def debug_ff_raw():
+    """Call Forex Factory directly and return raw diagnostics."""
+    import requests
+    from datetime import datetime, timezone
 
+    url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+    out = {
+        "url": url,
+        "now_utc": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        r = requests.get(
+            url,
+            timeout=20,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; NewsBot/1.0)",
+                "Accept": "application/json",
+            },
+        )
+        out["status"] = r.status_code
+        out["content_type"] = r.headers.get("Content-Type", "")
+        out["content_length"] = len(r.text)
+        out["first_200_chars"] = r.text[:200]
+        try:
+            data = r.json()
+            out["is_list"] = isinstance(data, list)
+            out["total_items"] = len(data) if isinstance(data, list) else 0
+            if isinstance(data, list) and data:
+                out["first_item"] = data[0]
+                # عدّ حسب impact
+                from collections import Counter
+                impacts = Counter(str(x.get("impact", "")).lower() for x in data)
+                countries = Counter(str(x.get("country", "")).upper() for x in data)
+                out["impacts_count"] = dict(impacts)
+                out["countries_count"] = dict(countries)
+                # عدّ ما يمر من الفلاتر
+                high_usd = [
+                    x for x in data
+                    if str(x.get("impact", "")).lower() == "high"
+                    and str(x.get("country", "")).upper() == "USD"
+                ]
+                out["high_usd_count"] = len(high_usd)
+                out["high_usd_sample"] = high_usd[:3]
+        except Exception as e:
+            out["json_error"] = str(e)
+    except Exception as exc:
+        out["request_error"] = str(exc)
+
+    return out
 
 @app.get("/debug/config")
 def debug_config():
