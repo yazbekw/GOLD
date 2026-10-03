@@ -31,6 +31,7 @@ class Settings:
 
     fmp_api_key: str = _env("FMP_API_KEY")
     finnhub_api_key: str = _env("FINNHUB_API_KEY")
+    ff_proxy_url: str = _env("FF_PROXY_URL")
 
     tz_name: str = _env("TZ_NAME", "Asia/Damascus")
     log_level: str = _env("LOG_LEVEL", "INFO")
