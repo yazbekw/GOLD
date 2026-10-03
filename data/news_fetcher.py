@@ -42,12 +42,20 @@ def _hash(*parts: str) -> str:
 
 
 def _is_high_impact(title: str, importance: str = "") -> bool:
-    imp = str(importance or "").lower()
+    """High impact ONLY if the 'impact' field says so.
+
+    No keyword fallback — FF marks impacts explicitly.
+    Finnhub uses numeric: 3 = high.
+    """
+    imp = str(importance or "").strip().lower()
     if imp in ("high", "3"):
         return True
-    t = title.upper()
-    return any(k in t for k in HIGH_KEYWORDS)
-
+    # For Finnhub where impact could be missing, use keywords
+    # but ONLY if impact is empty (not explicit low/medium)
+    if not imp:
+        t = title.upper()
+        return any(k in t for k in HIGH_KEYWORDS)
+    return False
 
 def _parse_dt(when: Any) -> datetime | None:
     if not when:
