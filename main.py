@@ -53,7 +53,11 @@ app = FastAPI(title="News & Macro Bot", version="0.1.0", lifespan=lifespan)
 def root():
     return {"ok": True, "service": "news-macro-bot", "tz": settings.tz_name}
 
-
+@app.get("/run")
+def run_now_get():
+    """Convenience — allows manual trigger from browser."""
+    return JSONResponse(jobs.run_all())
+    
 @app.head("/")
 def root_head():
     """Render health check uses HEAD / — respond 200 without body."""
