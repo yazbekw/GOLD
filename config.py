@@ -32,10 +32,12 @@ class Settings:
     fmp_api_key: str = _env("FMP_API_KEY")
     finnhub_api_key: str = _env("FINNHUB_API_KEY")
     ff_proxy_url: str = _env("FF_PROXY_URL")
+    ff_github_url: str = _env("FF_GITHUB_URL")
+
+    admin_token: str = _env("ADMIN_TOKEN")
 
     tz_name: str = _env("TZ_NAME", "Asia/Damascus")
     log_level: str = _env("LOG_LEVEL", "INFO")
-    ff_github_url: str = _env("FF_GITHUB_URL")
 
     gold_binance_symbol: str = _env("GOLD_BINANCE_SYMBOL", "PAXGUSDT")
     gold_yahoo_symbol: str = _env("GOLD_YAHOO_SYMBOL", "GC=F")
@@ -44,7 +46,7 @@ class Settings:
     allowed_countries: tuple[str, ...] = field(
         default_factory=lambda: tuple(
             c.strip().upper()
-            for c in _env("ALLOWED_COUNTRIES", "US").split(",")
+            for c in _env("ALLOWED_COUNTRIES", "USD").split(",")
             if c.strip()
         )
     )
