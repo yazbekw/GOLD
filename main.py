@@ -234,6 +234,70 @@ def debug_ff_raw():
 
     return out
 
+@app.get("/debug/github-ff")
+def debug_github_ff():
+    """Test GitHub FF URL directly."""
+    import requests
+    from config import settings
+
+    url = getattr(settings, "ff_github_url", "")
+    out = {
+        "url": url,
+        "url_set": bool(url),
+    }
+
+    if not url:
+        return out
+
+    try:
+        r = requests.get(
+            url,
+            timeout=15,
+            headers={
+                "User-Agent": "news-macro-bot/1.0",
+                "Accept": "application/json",
+            },
+        )
+        out["status"] = r.status_code
+        out["content_type"] = r.headers.get("Content-Type", "")
+        out["content_length"] = len(r.text)
+        out["first_200"] = r.text[:200]
+
+        if r.status_code == 200:
+            try:
+                data = r.json()
+                out["is_list"] = isinstance(data, list)
+                out["total_items"] = len(data) if isinstance(data, list) else 0
+
+                if isinstance(data, list) and data:
+                    from collections import Counter
+                    countries = Counter(str(x.get("country", "")).upper() for x in data)
+                    impacts = Counter(str(x.get("impact", "")).lower() for x in data)
+                    out["countries"] = dict(countries)
+                    out["impacts"] = dict(impacts)
+
+                    allowed = set(settings.allowed_countries)
+                    high_usd = [
+                        x for x in data
+                        if str(x.get("impact", "")).lower() == "high"
+                        and str(x.get("country", "")).upper() in allowed
+                    ]
+                    out["filtered_count"] = len(high_usd)
+                    out["filtered_sample"] = high_usd[:2]
+            except Exception as e:
+                out["json_error"] = str(e)
+
+        # Also test via news_fetcher
+        from data import news_fetcher
+        events = news_fetcher.fetch_forexfactory_from_github()
+        out["fetcher_count"] = len(events)
+        out["fetcher_sample"] = events[:2]
+
+    except Exception as exc:
+        out["error"] = str(exc)
+
+    return out
+    
 @app.get("/debug/finnhub-raw")
 def debug_finnhub_raw():
     """Call Finnhub directly and return raw response (truncated)."""
