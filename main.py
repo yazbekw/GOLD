@@ -63,7 +63,78 @@ def root_head():
     """Render health check uses HEAD / — respond 200 without body."""
     return Response(status_code=200)
 
+@app.get("/debug/news")
+def debug_news():
+    """Test news fetching directly."""
+    from data import news_fetcher
+    from config import settings
 
+    out = {
+        "has_fmp_key": bool(settings.fmp_api_key),
+        "fmp_key_prefix": settings.fmp_api_key[:6] if settings.fmp_api_key else "",
+        "allowed_countries": list(settings.allowed_countries),
+        "min_importance": settings.min_importance,
+    }
+
+    try:
+        fmp = news_fetcher.fetch_fmp()
+        out["fmp_count"] = len(fmp)
+        out["fmp_sample"] = fmp[:2]
+    except Exception as exc:
+        out["fmp_error"] = str(exc)
+
+    try:
+        ff = news_fetcher.fetch_forexfactory()
+        out["ff_count"] = len(ff)
+        out["ff_sample"] = ff[:2]
+    except Exception as exc:
+        out["ff_error"] = str(exc)
+
+    return out
+
+
+@app.get("/debug/fmp-raw")
+def debug_fmp_raw():
+    """Call FMP API directly and return raw response."""
+    import requests
+    from datetime import datetime, timedelta, timezone
+    from config import settings
+
+    if not settings.fmp_api_key:
+        return {"error": "no FMP key"}
+
+    start = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    end = (datetime.now(timezone.utc) + timedelta(days=7)).strftime("%Y-%m-%d")
+
+    urls = [
+        f"https://financialmodelingprep.com/stable/economic-calendar?from={start}&to={end}&apikey={settings.fmp_api_key}",
+        f"https://financialmodelingprep.com/api/v3/economic_calendar?from={start}&to={end}&apikey={settings.fmp_api_key}",
+    ]
+
+    results = []
+    for url in urls:
+        try:
+            r = requests.get(url, timeout=20)
+            body = r.text[:500]
+            try:
+                j = r.json()
+                count = len(j) if isinstance(j, list) else "not-list"
+                sample = j[:1] if isinstance(j, list) and j else None
+            except Exception:
+                count = "not-json"
+                sample = None
+            results.append({
+                "url": url.split("apikey=")[0],
+                "status": r.status_code,
+                "count": count,
+                "sample": sample,
+                "body_start": body if count != "not-json" else body,
+            })
+        except Exception as exc:
+            results.append({"url": url.split("apikey=")[0], "error": str(exc)})
+
+    return {"start": start, "end": end, "results": results}
+    
 @app.get("/health")
 def health():
     return {"ok": True}
