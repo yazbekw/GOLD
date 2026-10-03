@@ -65,17 +65,38 @@ def root_head():
 
 @app.get("/debug/news")
 def debug_news():
-    """Test news fetching directly."""
+    """Test news fetching directly from all sources."""
     from data import news_fetcher
     from config import settings
 
     out = {
         "has_fmp_key": bool(settings.fmp_api_key),
-        "fmp_key_prefix": settings.fmp_api_key[:6] if settings.fmp_api_key else "",
+        "has_finnhub_key": bool(getattr(settings, "finnhub_api_key", "")),
+        "finnhub_key_prefix": (
+            settings.finnhub_api_key[:6]
+            if getattr(settings, "finnhub_api_key", "") else ""
+        ),
         "allowed_countries": list(settings.allowed_countries),
         "min_importance": settings.min_importance,
     }
 
+    # Finnhub
+    try:
+        fh = news_fetcher.fetch_finnhub()
+        out["finnhub_count"] = len(fh)
+        out["finnhub_sample"] = fh[:2]
+    except Exception as exc:
+        out["finnhub_error"] = str(exc)
+
+    # ForexFactory
+    try:
+        ff = news_fetcher.fetch_forexfactory()
+        out["ff_count"] = len(ff)
+        out["ff_sample"] = ff[:2]
+    except Exception as exc:
+        out["ff_error"] = str(exc)
+
+    # FMP
     try:
         fmp = news_fetcher.fetch_fmp()
         out["fmp_count"] = len(fmp)
@@ -83,12 +104,13 @@ def debug_news():
     except Exception as exc:
         out["fmp_error"] = str(exc)
 
+    # Combined
     try:
-        ff = news_fetcher.fetch_forexfactory()
-        out["ff_count"] = len(ff)
-        out["ff_sample"] = ff[:2]
+        events, diag = news_fetcher.fetch_all()
+        out["final_diag"] = diag
+        out["final_count"] = len(events)
     except Exception as exc:
-        out["ff_error"] = str(exc)
+        out["final_error"] = str(exc)
 
     return out
 
