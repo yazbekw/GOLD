@@ -234,6 +234,70 @@ def debug_ff_raw():
 
     return out
 
+@app.get("/debug/finnhub-raw")
+def debug_finnhub_raw():
+    """Call Finnhub directly and return raw response (truncated)."""
+    import requests
+    from datetime import datetime, timedelta, timezone
+    from config import settings
+
+    key = getattr(settings, "finnhub_api_key", "")
+    if not key:
+        return {"error": "no finnhub key"}
+
+    start = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    end = (datetime.now(timezone.utc) + timedelta(days=7)).strftime("%Y-%m-%d")
+
+    out = {"start": start, "end": end, "url": "https://finnhub.io/api/v1/calendar/economic"}
+
+    try:
+        r = requests.get(
+            "https://finnhub.io/api/v1/calendar/economic",
+            params={"from": start, "to": end, "token": key},
+            timeout=20,
+        )
+        out["status"] = r.status_code
+        out["content_type"] = r.headers.get("Content-Type", "")
+        out["content_length"] = len(r.text)
+        out["first_500_chars"] = r.text[:500]
+
+        try:
+            data = r.json()
+            out["keys"] = list(data.keys()) if isinstance(data, dict) else "not-dict"
+
+            # Finnhub returns {"economicCalendar": [...]}
+            cal = data.get("economicCalendar") if isinstance(data, dict) else None
+            if isinstance(cal, list):
+                out["total_items"] = len(cal)
+                out["first_item"] = cal[0] if cal else None
+
+                # Count by country
+                from collections import Counter
+                countries = Counter(str(x.get("country", "")).upper() for x in cal)
+                out["countries"] = dict(countries)
+
+                # Count by impact
+                impacts = Counter(str(x.get("impact", "")).lower() for x in cal)
+                out["impacts"] = dict(impacts)
+
+                # Count events matching our filters
+                allowed = set(settings.allowed_countries)
+                high = [
+                    x for x in cal
+                    if str(x.get("impact", "")).lower() in ("high", "3")
+                    and str(x.get("country", "")).upper() in allowed
+                ]
+                out["high_filtered_count"] = len(high)
+                out["high_filtered_sample"] = high[:3]
+            else:
+                out["economicCalendar_type"] = type(cal).__name__
+        except Exception as e:
+            out["json_error"] = str(e)
+    except Exception as exc:
+        out["request_error"] = str(exc)
+
+    return out
+
 @app.get("/debug/config")
 def debug_config():
     """Check env vars are loaded (does NOT expose secrets)."""
