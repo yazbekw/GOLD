@@ -361,7 +361,89 @@ def debug_finnhub_raw():
         out["request_error"] = str(exc)
 
     return out
+@app.get("/debug/supabase")
+def debug_supabase():
+    """Test Supabase connection and insert."""
+    from storage import db
+    from config import settings
 
+    out = {
+        "url_set": bool(settings.supabase_url),
+        "key_set": bool(settings.supabase_key),
+        "key_prefix": settings.supabase_key[:20] if settings.supabase_key else "",
+    }
+
+    try:
+        client = db.client()
+        out["client_ok"] = True
+    except Exception as exc:
+        out["client_error"] = str(exc)
+        return out
+
+    # Test SELECT
+    try:
+        res = client.table("events").select("id").limit(1).execute()
+        out["select_ok"] = True
+        out["existing_rows"] = len(res.data) if res.data else 0
+    except Exception as exc:
+        out["select_error"] = str(exc)
+
+    # Test INSERT
+    try:
+        test_event = {
+            "external_id": f"test_{int(__import__('time').time())}",
+            "event_time": "2026-12-31T23:59:59+00:00",
+            "country": "USD",
+            "currency": "USD",
+            "title": "DEBUG TEST EVENT",
+            "importance": "high",
+            "forecast": "",
+            "previous": "",
+            "actual": "",
+            "source": "debug",
+        }
+        res = client.table("events").insert(test_event).execute()
+        out["insert_ok"] = True
+        out["inserted_id"] = res.data[0]["id"] if res.data else None
+
+        # Cleanup
+        if res.data:
+            client.table("events").delete().eq("id", res.data[0]["id"]).execute()
+            out["cleanup"] = "done"
+    except Exception as exc:
+        out["insert_ok"] = False
+        out["insert_error"] = str(exc)
+
+    # Test UPSERT (الذي نستخدمه فعليًا)
+    try:
+        upsert_event = {
+            "external_id": f"upsert_test_{int(__import__('time').time())}",
+            "event_time": "2026-12-31T23:59:59+00:00",
+            "country": "USD",
+            "currency": "USD",
+            "title": "UPSERT TEST",
+            "importance": "high",
+            "forecast": "",
+            "previous": "",
+            "actual": "",
+            "source": "debug",
+        }
+        res = client.table("events").upsert(
+            upsert_event, on_conflict="external_id"
+        ).execute()
+        out["upsert_ok"] = True
+
+        # Cleanup
+        if res.data:
+            client.table("events").delete().eq(
+                "external_id", upsert_event["external_id"]
+            ).execute()
+    except Exception as exc:
+        out["upsert_ok"] = False
+        out["upsert_error"] = str(exc)
+
+    return out
+    
 @app.get("/debug/config")
 def debug_config():
     """Check env vars are loaded (does NOT expose secrets)."""
