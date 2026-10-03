@@ -31,6 +31,8 @@ class Settings:
 
     te_api_key: str = _env("TE_API_KEY")
 
+    finnhub_api_key: str = _env("FINNHUB_API_KEY"
+
     fmp_api_key: str = _env("FMP_API_KEY")
 
     tz_name: str = _env("TZ_NAME", "Asia/Damascus")
