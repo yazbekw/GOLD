@@ -35,6 +35,7 @@ class Settings:
 
     tz_name: str = _env("TZ_NAME", "Asia/Damascus")
     log_level: str = _env("LOG_LEVEL", "INFO")
+    ff_github_url: str = _env("FF_GITHUB_URL")
 
     gold_binance_symbol: str = _env("GOLD_BINANCE_SYMBOL", "PAXGUSDT")
     gold_yahoo_symbol: str = _env("GOLD_YAHOO_SYMBOL", "GC=F")
