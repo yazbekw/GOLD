@@ -1,0 +1,41 @@
+name: Fetch FF Calendar
+
+on:
+  schedule:
+    # كل يوم 03:00 UTC = 06:00 بتوقيت سوريا
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Forex Factory JSON
+        run: |
+          mkdir -p data/cache
+          curl -sSL \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+            -H "Accept: application/json" \
+            -o data/cache/ff_calendar.json \
+            "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+
+          # تحقق من صحة الاستجابة
+          if ! head -c 1 data/cache/ff_calendar.json | grep -q '\['; then
+            echo "❌ FF returned invalid response"
+            cat data/cache/ff_calendar.json
+            exit 1
+          fi
+
+          echo "✅ Fetched $(wc -c < data/cache/ff_calendar.json) bytes"
+
+      - name: Commit & push
+        run: |
+          git config user.name "ff-bot"
+          git config user.email "ff-bot@users.noreply.github.com"
+          git add data/cache/ff_calendar.json
+          git commit -m "chore: refresh FF calendar $(date -u +%Y-%m-%d)" || echo "No changes"
+          git push
