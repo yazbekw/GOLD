@@ -443,7 +443,45 @@ def debug_supabase():
         out["upsert_error"] = str(exc)
 
     return out
+@app.get("/debug/macro")
+def debug_macro():
+    """Test macro fetch from yfinance."""
+    from data import macro_fetcher
+    import yfinance as yf
 
+    out = {}
+
+    # Test yfinance directly
+    for name, symbol in [
+        ("DXY", "DX-Y.NYB"),
+        ("US10Y", "^TNX"),
+        ("VIX", "^VIX"),
+    ]:
+        try:
+            t = yf.Ticker(symbol)
+            hist = t.history(period="5d", interval="1h")
+            if hist is None or hist.empty:
+                out[name] = {"error": "empty history"}
+            else:
+                last = float(hist["Close"].iloc[-1])
+                out[name] = {
+                    "ok": True,
+                    "value": round(last, 4),
+                    "rows": len(hist),
+                }
+        except Exception as exc:
+            out[name] = {"error": str(exc)}
+
+    # Test our fetcher
+    try:
+        result = macro_fetcher.fetch_macro()
+        out["fetcher_result"] = result
+        out["fetcher_keys"] = list(result.keys())
+    except Exception as exc:
+        out["fetcher_error"] = str(exc)
+
+    return out
+    
 @app.get("/test-pre-event/{event_id}")
 def test_pre_event(event_id: int):
     """Generate a pre-event notification for the given event ID (for testing)."""
