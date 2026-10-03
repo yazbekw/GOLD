@@ -443,6 +443,40 @@ def debug_supabase():
         out["upsert_error"] = str(exc)
 
     return out
+
+@app.get("/test-pre-event/{event_id}")
+def test_pre_event(event_id: int):
+    """Generate a pre-event notification for the given event ID (for testing)."""
+    from storage import db
+    from data import macro_fetcher, price_fetcher
+    from engine import decision_engine
+    from notify import telegram
+
+    # Get event
+    res = db.client().table("events").select("*").eq("id", event_id).limit(1).execute()
+    if not res.data:
+        return {"error": f"Event {event_id} not found"}
+
+    event = res.data[0]
+
+    # Fetch context
+    macro = macro_fetcher.fetch_macro()
+    gold = price_fetcher.fetch_gold()
+
+    # Build brief
+    brief = decision_engine.build_pre_event_brief(event, macro, gold)
+
+    # Send
+    ok = telegram.send_pre_event(event, brief)
+
+    return {
+        "ok": ok,
+        "event": event.get("title"),
+        "bias": brief.get("bias"),
+        "confidence": brief.get("confidence"),
+        "macro_keys": list(macro.keys()),
+        "gold_price": gold.get("price"),
+    }
     
 @app.get("/debug/config")
 def debug_config():
